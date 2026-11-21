@@ -11,26 +11,76 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/ip", async (req, res) => {
-  const ip = req.body?.valor;
-  const apiKey = process.env.IP_API_KEY;
+async function consultarAbstract({
+  req,
+  res,
+  campo,
+  variableClave,
+  endpoint,
+  parametro
+}) {
+  const valor = req.body?.valor;
+  const apiKey = process.env[variableClave];
 
-  if (!ip) return res.status(400).json({ error: "Falta el dato valor." });
-  if (!apiKey) return res.status(503).json({ error: "Falta configurar IP_API_KEY en Render." });
+  if (!valor) {
+    return res.status(400).json({ error: `Falta el dato valor (${campo}).` });
+  }
+
+  if (!apiKey) {
+    return res.status(503).json({
+      error: `Falta configurar ${variableClave} en Render.`
+    });
+  }
 
   try {
-    const url = new URL("https://ipgeolocation.abstractapi.com/v1/");
+    const url = new URL(endpoint);
     url.searchParams.set("api_key", apiKey);
-    url.searchParams.set("ip_address", ip);
+    url.searchParams.set(parametro, String(valor).trim());
 
     const respuesta = await fetch(url);
     const datos = await respuesta.json();
 
-    res.status(respuesta.ok ? 200 : 502).json(datos);
-  } catch {
-    res.status(502).json({ error: "No se pudo conectar con el servicio." });
+    return res.status(respuesta.ok ? 200 : 502).json(datos);
+  } catch (error) {
+    console.error(`Error en consulta ${campo}:`, error);
+    return res.status(502).json({
+      error: "No se pudo conectar con AbstractAPI."
+    });
   }
-});
+}
+
+app.post("/api/ip", (req, res) =>
+  consultarAbstract({
+    req,
+    res,
+    campo: "IP",
+    variableClave: "IP_API_KEY",
+    endpoint: "https://ip-intelligence.abstractapi.com/v1/",
+    parametro: "ip_address"
+  })
+);
+
+app.post("/api/email", (req, res) =>
+  consultarAbstract({
+    req,
+    res,
+    campo: "correo",
+    variableClave: "EMAIL_API_KEY",
+    endpoint: "https://emailreputation.abstractapi.com/v1/",
+    parametro: "email"
+  })
+);
+
+app.post("/api/phone", (req, res) =>
+  consultarAbstract({
+    req,
+    res,
+    campo: "teléfono",
+    variableClave: "PHONE_API_KEY",
+    endpoint: "https://phoneintelligence.abstractapi.com/v1/",
+    parametro: "phone"
+  })
+);
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Servidor activo en el puerto ${port}`));
